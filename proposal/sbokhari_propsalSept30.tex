@@ -1,0 +1,56 @@
+\documentclass[11pt]{exam}
+\usepackage{amsmath,amssymb,url,graphicx,tabularx,array,geometry,amsthm}
+
+\begin{document}
+
+\title{16-720 Project Proposal: Selected Object Area Tracking}
+\date{}
+\author{Syed Zahir Bokhari (AndrewID: sbokhari)}
+
+\maketitle
+
+\section{Abstract}
+In many situations object tracking systems give only a position or bounding box
+of the object being tracked. However there are many cases during tracking a
+foreground object requires us to know all the pixels associated with the
+forground objects. This is typically achived through a background subtraction
+system, which will reveal all foreground pixels. However in outdoor and publics
+spaces, the background is often dynamic, and contains much motion which we would
+not consider foreground.
+
+Allowing the user to specify a desired object (or objects) of interest by means
+of a fuzzy selection will make it possible to discover the boundary of the
+object, by menas of \cite{canny} or \cite{snakes}. Only one method should be
+needed, however there is a tradeoff between accuracy and time.
+
+Once the object is selected, \cite{bacsub} details a robust way to estimate the
+background of outdoor scenes without foreknowledge of the background, and is
+adaptive to long term changes in the scene. This should help in discovering the
+changing boundery of the object as the video plays, and move the contour as
+necessary.
+
+\section{Technologies}
+MATLAB for prototyping and proof of concept. Python and OpenCV for final
+implementation if time permits.
+
+\begin{thebibliography}{9}
+\bibitem{canny}
+J. Canny.
+"A Computational Approach to Edge Detection,"
+\emph{Pattern Analysis and Machine Intelligence, IEEE Transactions} on
+(Volume:PAMI-8, Issue: 6)
+
+\bibitem{snakes}
+M. Kass, A. Witkin, D. Terzopoulos.
+"Snakes: Active Contour Model,"
+\emph{International Journal of Computer Vision}
+
+\bibitem{bacsub}
+C. Stauffer, W. Grimson.
+"Adaptive background mixture models for real-time tracking,"
+\emph{Computer Vision and Pattern Recognition, 1999. IEEE Computer Society
+Conference} on. (Volume:2)
+
+\end{thebibliography}
+
+\end{document}
