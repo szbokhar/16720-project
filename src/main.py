@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 
 from Displayer import *
-from Tracker import *
+from MyMeanShiftTracker import *
 
 cap = cv2.VideoCapture(0)
 tracker = None
@@ -13,7 +13,7 @@ while(True):
     ret, frame = cap.read()
 
     if tracker is None:
-        tracker = Tracker(frame, (50, 40), None)
+        tracker = MeanShiftTracker(frame, (70, 70), None)
 
     tracker.update_warp(frame)
     pframe = tracker.get_frame_with_tracker()
