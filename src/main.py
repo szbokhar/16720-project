@@ -13,7 +13,7 @@ while(True):
     ret, frame = cap.read()
 
     if tracker is None:
-        tracker = MeanShiftTracker(frame, (70, 70), None)
+        tracker = MeanShiftTracker(frame, (20, 20), None)
 
     tracker.update_warp(frame)
     pframe = tracker.get_frame_with_tracker()
