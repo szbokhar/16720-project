@@ -20,40 +20,79 @@ class MeanShiftTracker:
             cy = int(ih/2)
             init_pos = (cx-ww, cy-wh, cx+ww, cy+wh)
 
+        self.init_template = init_pos
         self.template = init_pos
         self.template_dpos = (0,0)
         self.first_frame = init_frame
         self.meancol = (255,0,0)
+        self.printstuff = False
+        self.fileID = 0
 
         self.init_tracking_model()
         self.init_presence_model()
 
     def init_tracking_model(self):
-        csv_mus = np.genfromtxt('track_model_mu.csv', delimiter=",")
-        csv_sigs = np.genfromtxt('track_model_sigma.csv', delimiter=",")
+        csv_mus = np.genfromtxt('models/track_model_mu.csv', delimiter=",")
+        csv_sigs = np.genfromtxt('models/track_model_sigma.csv', delimiter=",")
         mus = [csv_mus[0,:], csv_mus[1,:], csv_mus[2,:]]
         sigmas = [csv_sigs[0:3,0:3], csv_sigs[0:3,3:6], csv_sigs[0:3,6:9]]
         self.tracking_model = GaussianMixtureModel(3, mus, sigmas)
-        self.tracking_state = Tracking.Lost
+        self.tracking_state = Tracking.Stationary
 
     def init_presence_model(self):
-        csv_mus = np.genfromtxt('presence_model_mu.csv', delimiter=",")
-        csv_sigs = np.genfromtxt('presence_model_sigma.csv', delimiter=",")
+        csv_mus = np.genfromtxt('models/presence_model_mu.csv', delimiter=",")
+        csv_sigs = np.genfromtxt('models/presence_model_sigma.csv', delimiter=",")
         mus = [csv_mus[0,:], csv_mus[1,:]]
         sigmas = [csv_sigs[0:10,0:10]*100, csv_sigs[0:10,10:20]*100]
         self.presence_model = GaussianMixtureModel(2, mus, sigmas)
-        self.presence_state = Presence.TrackerOut
+        self.presence_state = Presence.TrackerIn
+
+    def toggle_printstuff(self):
+        self.printstuff = not self.printstuff
+        if self.printstuff:
+            self.fileID = self.fileID + 1
+            self.gest_file = open('matlab/data/ges3_%d.txt'%self.fileID, 'w')
+        else:
+            self.gest_file.close()
+
 
     def update_warp(self, new_frame):
         self.current_frame = self.__scale_image(new_frame)
 
         if self.tracking_on:
-            fram = cv2.GaussianBlur(self.__thresh(self.current_frame), (5,5), 0)
+            fram = cv2.GaussianBlur(self.__thresh(self.current_frame, 0.5), (5,5), 0)
             tmp = self.template
+
+            seekrange = 2
+            if self.presence_state is Presence.TrackerIn and self.tracking_state is Tracking.Lost:
+                xint = np.cumsum(np.sum(fram,0))
+                yint = np.cumsum(np.sum(fram,1))
+                maxx = xint[-1]
+                cx = 0
+                for i in range(xint.size-1):
+                    if xint[i+1] > maxx/2:
+                        cx = i
+                        break
+                maxy = yint[-1]
+                cy = 0
+                for i in range(yint.size-1):
+                    if yint[i+1] > maxy/2:
+                        cy = i
+                        break
+
+                (x1,y1,x2,y2) = tmp
+                xr = (x2-x1)/2
+                yr = (y2-y1)/2
+                tmp2 = (int(cx-xr), int(cy-yr), int(cx+xr), int(cy+yr))
+                if not (tmp2[0] < 0 or tmp2[1] < 0):
+                    tmp = tmp2
+                seekrange = 2
+
+            fram = cv2.GaussianBlur(self.__thresh(self.current_frame), (5,5), 0)
             for i in range(30):
                 (x1,y1,x2,y2) = tmp
-                w = int((x2-x1)/1)
-                h = int((y2-y1)/1)
+                w = int((x2-x1)/2*seekrange)
+                h = int((y2-y1)/2*seekrange)
                 cx = int((x1+x2)/2)
                 cy = int((y1+y2)/2)
                 roi = fram[(cy-h):(cy+h), (cx-w):(cx+w)]
@@ -72,30 +111,42 @@ class MeanShiftTracker:
             self.update_template(tmp)
             self.update_state(fram)
 
+            if self.printstuff and self.presence_state is Presence.TrackerIn:
+                (x1,y1,x2,y2) = self.template
+                (dx, dy) = self.template_dpos
+                cx = int((x1+x2)/2)
+                cy = int((y1+y2)/2)
+                print(cx, cy, dx, dy)
+                self.gest_file.write('%f %f %f %f'%(cx, cy, dx, dy))
+                self.gest_file.write('\n')
+
+            if self.presence_state is Presence.TrackerOut:
+                self.update_template(self.init_template)
+                self.update_template(self.init_template)
+
 
             cv2.imshow('wimag', fram)
 
     def update_state(self, fram):
-            (x1,y1,x2,y2) = self.template
-            roi = fram[y1:y2, x1:x2]
-            av = np.mean(roi)
-            (dx, dy) = self.template_dpos
-            mp = np.array([dx, dy, av])
-            tracking_state = np.argmax(self.tracking_model.eval(mp))
-            self.tracking_state = Tracking.assign(tracking_state)
+        (x1,y1,x2,y2) = self.template
+        roi = fram[y1:y2, x1:x2]
+        av = np.mean(roi)
+        (dx, dy) = self.template_dpos
+        mp = np.array([dx, dy, av])
+        tracking_state = np.argmax(self.tracking_model.eval(mp))
+        self.tracking_state = Tracking.assign(tracking_state)
 
-            hist,_ = np.histogram(fram, 10)
-            hist = hist/np.sum(hist);
-            presence_state = np.argmax(self.presence_model.eval(hist))
-            self.presence_state = Presence.assign(presence_state)
-            print(self.tracking_state, self.presence_state)
+        hist,_ = np.histogram(fram, 10)
+        hist = hist/np.sum(hist);
+        presence_state = np.argmax(self.presence_model.eval(hist))
+        self.presence_state = Presence.assign(presence_state)
+        # print(self.tracking_state, self.presence_state)
 
 
     def update_template(self, newpos):
         (x0,y0,_,_) = self.template
         (x1,y1,_,_) = newpos
         self.template = newpos
-        print(newpos)
         self.template_dpos = (x1-x0,y1-y0)
 
 
@@ -116,7 +167,7 @@ class MeanShiftTracker:
         if self.presence_state is Presence.TrackerIn:
             img = cv2.rectangle(self.current_frame, (int(x1),int(y1)), (int(x2),int(y2)), (0,0,0), 1)
         else:
-            img = self.current_frame
+            img = cv2.rectangle(self.current_frame, (int(x1),int(y1)), (int(x2),int(y2)), (255,255,255), 1)
 
         return img
 

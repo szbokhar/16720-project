@@ -15,12 +15,17 @@ while(True):
     if tracker is None:
         tracker = MeanShiftTracker(frame, (20, 20), None)
 
+    key = displayer.get_key()
+
+    if key & 0xFF == ord('a'):
+        print('---------------------------------')
+        tracker.toggle_printstuff()
+
     tracker.update_warp(frame)
     pframe = tracker.get_frame_with_tracker()
 
     # Display the resulting frame
     displayer.show_frame(pframe)
-    key = displayer.get_key()
 
     if key & 0xFF == ord(' '):
         tracker.toggle_tracking()
