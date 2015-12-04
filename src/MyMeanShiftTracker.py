@@ -3,6 +3,7 @@ import numpy as np
 from numpy.linalg import inv, norm
 from GaussianModel import *
 from States import *
+from HiddenMarkovModel import *
 
 class MeanShiftTracker:
 
@@ -27,9 +28,13 @@ class MeanShiftTracker:
         self.meancol = (255,0,0)
         self.printstuff = False
         self.fileID = 0
+        self.moving_run = 0
+        self.stationary_run = 0
+        self.likely_gesture = []
 
         self.init_tracking_model()
         self.init_presence_model()
+        self.init_hmm()
 
     def init_tracking_model(self):
         csv_mus = np.genfromtxt('models/track_model_mu.csv', delimiter=",")
@@ -47,13 +52,25 @@ class MeanShiftTracker:
         self.presence_model = GaussianMixtureModel(2, mus, sigmas)
         self.presence_state = Presence.TrackerIn
 
+    def init_hmm(self):
+        self.gestures = []
+        self.gestures.append(HiddenMarkovModel('models/UD'))
+        self.gestures.append(HiddenMarkovModel('models/LL'))
+        self.gestures.append(HiddenMarkovModel('models/LR'))
+
+    def log_observation(self, obs):
+        for i in range(len(self.gestures)):
+            self.gestures[i].log_observation(obs)
+
     def toggle_printstuff(self):
         self.printstuff = not self.printstuff
+        '''
         if self.printstuff:
             self.fileID = self.fileID + 1
-            self.gest_file = open('matlab/data/ges3_%d.txt'%self.fileID, 'w')
+            self.gest_file = None # open('matlab/data/ges3_%d.txt'%self.fileID, 'w')
         else:
             self.gest_file.close()
+        '''
 
 
     def update_warp(self, new_frame):
@@ -120,12 +137,38 @@ class MeanShiftTracker:
                 self.gest_file.write('%f %f %f %f'%(cx, cy, dx, dy))
                 self.gest_file.write('\n')
 
-            if self.presence_state is Presence.TrackerOut:
-                self.update_template(self.init_template)
-                self.update_template(self.init_template)
+            if self.presence_state is Presence.TrackerIn:
+                self.log_observation(self.template_dpos)
+                self.recognize_gesture()
 
+            if self.presence_state is Presence.TrackerOut:
+                self.gestures[0].reset_observations()
+                self.gestures[1].reset_observations()
+                self.gestures[2].reset_observations()
+                self.update_template(self.init_template)
+                # self.update_template(self.init_template)
 
             cv2.imshow('wimag', fram)
+
+    def recognize_gesture(self):
+        g0 = self.gestures[0].compute_likelihood()
+        g1 = self.gestures[1].compute_likelihood()
+        g2 = self.gestures[2].compute_likelihood()
+        self.likely_gesture.append(np.argmax([g0[0],g1[0],g2[0]]))
+        print(np.argmax([g0[0],g1[0],g2[0]]), self.tracking_state, self.moving_run, self.stationary_run)
+        if self.stationary_run == 3 and len(self.likely_gesture) >= 6:
+            st = np.sort(self.likely_gesture[-6:])
+            stable = (st[0] == st[-1])
+            if stable:
+                print('Good', st[0])
+            else:
+                print('Nothing')
+            self.likely_gesture = []
+            self.gestures[0].reset_observations()
+            self.gestures[1].reset_observations()
+            self.gestures[2].reset_observations()
+        # print(g0)
+        # print(np.argsort(g0))
 
     def update_state(self, fram):
         (x1,y1,x2,y2) = self.template
@@ -134,12 +177,25 @@ class MeanShiftTracker:
         (dx, dy) = self.template_dpos
         mp = np.array([dx, dy, av])
         tracking_state = np.argmax(self.tracking_model.eval(mp))
+        if self.tracking_state is Tracking.Stationary and Tracking.assign(tracking_state) is Tracking.Stationary:
+            self.stationary_run = self.stationary_run + 1
+            self.moving_run = 0
+        else:
+            if self.moving_run == 0:
+                self.gestures[0].reset_observations(5)
+                self.gestures[1].reset_observations(5)
+                self.gestures[2].reset_observations(5)
+            self.moving_run = self.moving_run + 1
+            self.stationary_run = 0
         self.tracking_state = Tracking.assign(tracking_state)
 
         hist,_ = np.histogram(fram, 10)
         hist = hist/np.sum(hist);
         presence_state = np.argmax(self.presence_model.eval(hist))
         self.presence_state = Presence.assign(presence_state)
+        if self.presence_state is Presence.TrackerOut:
+            self.stationary_run = 0
+            self.moving_run = 0
         # print(self.tracking_state, self.presence_state)
 
 
