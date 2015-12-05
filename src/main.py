@@ -23,6 +23,9 @@ while(True):
 
     tracker.update_warp(frame)
     pframe = tracker.get_frame_with_tracker()
+    gest = tracker.recognize_gesture()
+    if gest is not None:
+        print(gest)
 
     # Display the resulting frame
     displayer.show_frame(pframe)

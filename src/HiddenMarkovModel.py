@@ -26,16 +26,26 @@ class HiddenMarkovModel:
             self.obser = self.obser[-keep:]
 
     def compute_likelihood(self):
+        val = [-10000]
+        for i in range(15,len(self.obser)):
+            fw = self.forward(self.obser[-i-1:])
+            val.append(np.log(np.sum(fw[-1,:]))/(i+1))
+            srt = np.argsort(fw[-1,:])
+            # print(val[-1]/(i+1), srt[-1], self.obser[-i-1:])
+        # print('val', val)
+
+        '''
         fw = self.forward(self.obser)
-        srt = np.argsort(fw[-1,:])
-        return (np.log(np.sum(fw[-1,:])), srt[-1])
+        return (np.log(np.sum(fw[-1,:])), 7)
+        '''
+        return val[-1]
 
     def forward(self, X):
         a = self.A
         b = self.B
         p = self.p
         K = a.shape[0]
-        T = len(self.obser)
+        T = len(X)
 
         alpha = np.zeros([T,K])
         alpha[0,:] = b[:, X[0]]*p

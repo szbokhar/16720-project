@@ -24,3 +24,20 @@ class Tracking(Enum):
             return Tracking.Lost
         elif val == 2:
             return Tracking.Stationary
+
+class Gesture(Enum):
+    PausePlay = 0
+    Rewind = 1
+    Fastforward = 2
+    Nothing = 3
+
+    @staticmethod
+    def assign(val):
+        if val == 0:
+            return Gesture.PausePlay
+        elif val == 1:
+            return Gesture.Rewind
+        elif val == 2:
+            return Gesture.Fastforward
+        elif val == 3:
+            return Gesture.Nothing
