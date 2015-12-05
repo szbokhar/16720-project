@@ -152,7 +152,7 @@ class MeanShiftTracker:
             if self.presence_state is Presence.TrackerIn:
                 self.log_observation(self.template_dpos)
                 # self.recognize_gesture()
-                if self.stationary_run == 10:
+                if self.stationary_run == 7:
                     self.allow_gesture = True
 
             if self.presence_state is Presence.TrackerOut:
@@ -169,7 +169,7 @@ class MeanShiftTracker:
         G = self.compute_likelihood()
         self.likely_gesture.append(np.argmax(G))
 
-        if self.stationary_run == 3 and len(self.likely_gesture) >= 10 and self.allow_gesture:
+        if self.stationary_run == 3 and len(self.likely_gesture) >= 7 and self.allow_gesture:
             st = np.sort(self.likely_gesture[-6:])
             stable = (st[0] == st[-1])
             if stable:
