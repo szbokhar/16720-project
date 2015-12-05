@@ -3,10 +3,14 @@ import cv2
 
 from Displayer import *
 from MyMeanShiftTracker import *
+from vlcclient import VLCClient
 
 cap = cv2.VideoCapture(0)
 tracker = None
 displayer = Displayer('Debug Window')
+
+vlc = VLCClient("::1")
+vlc.connect()
 
 while(True):
     # Capture frame-by-frame
@@ -26,6 +30,12 @@ while(True):
     gest = tracker.recognize_gesture()
     if gest is not None:
         print(gest)
+        if gest is Gesture.PausePlay:
+            vlc.pause()
+        elif gest is Gesture.Rewind:
+            vlc.seek('-30')
+        elif gest is Gesture.Fastforward:
+            vlc.seek('+30')
 
     # Display the resulting frame
     displayer.show_frame(pframe)
